@@ -1,33 +1,37 @@
 import java.util.*;
 
+// --- DATA STRUCTURES ---
+
 class Song {
     String title;
+    int duration;
     Song next;
     Song prev;
 
-    Song(String title) {
+    Song(String title, int duration) {
         this.title = title;
+        this.duration = duration;
     }
 }
 
 public class VibeTuneEngine {
     private Song head = null;
     private Song current = null;
-    
-    // 1. Stack สำหรับ Recently Played (History) - LIFO
+
+    // Stack
     private Stack<String> history = new Stack<>();
-    
-    // 2. Queue สำหรับ Up Next (Booking) - FIFO
-    private Queue<String> upNext = new LinkedList<>();
-    private List<String> queueBackup = new ArrayList<>();
+
+    // Queue
+    private Queue<String> logs = new LinkedList<>();
+
     private boolean loopMode = false;
 
-    // 3. DLL & CLL สำหรับ Main Playlist
-    public void addSong(String title) {
-        Song newSong = new Song(title);
+    // DLL & CLL
+    public void addSong(String title, int duration) {
+        Song newSong = new Song(title, duration);
         if (head == null) {
             head = newSong;
-            head.next = head; //CLL
+            head.next = head; // CLL: ตัวสุดท้ายชี้กลับตัวแรก
             head.prev = head;
             current = head;
         } else {
@@ -37,7 +41,8 @@ public class VibeTuneEngine {
             newSong.next = head;
             head.prev = newSong;
         }
-        System.out.println(">> Added to Library: " + title);
+        addLog("Added: " + title);
+        System.out.println(">> Added: " + title + " (" + (duration / 60) + "m " + (duration % 60) + "s)");
     }
 
     public void playNext() {
@@ -45,92 +50,133 @@ public class VibeTuneEngine {
             System.out.println(">> No songs in playlist!");
             return;
         }
-        history.push(current.title); //Stack
+
+        // Logic สำหรับ Toggle Loop: ถ้าถึงเพลงสุดท้ายแล้ว Loop OFF จะไม่วนกลับ
+        if (current.next == head && !loopMode) {
+            System.out.println(">> End of playlist. Enable Loop Mode to repeat.");
+            addLog("Reached end of list (Loop OFF)");
+            return;
+        }
+
+        history.push(current.title); // ใช้ Stack เก็บประวัติ
         current = current.next;
+        addLog("Skipped to: " + current.title);
         System.out.println(">> Now Playing: " + current.title);
     }
 
-    //Recursion Deep Scan
-    /*public void scanMusicFolders(int level) {
-        if (level == 0) return;
-        System.out.println("...Scanning Sub-folder Level " + level + " [Recursive Search]");
-        scanMusicFolders(level - 1);
-    }*/
+    // ITERATIVE
+    public void displayLibrary() {
+        if (head == null) {
+            System.out.println(">> Library is empty!");
+            return;
+        }
+        System.out.println("\n--- Music Library (Iterative Display) ---");
+        Song temp = head;
+        do {
+            String marker = (temp == current) ? "[PLAYING] -> " : "           - ";
+            System.out.println(marker + temp.title + " (" + (temp.duration / 60) + "m " + (temp.duration % 60) + "s)");
+            temp = temp.next;
+        } while (temp != head); // เงื่อนไขหยุดเมื่อวนครบรอบ CLL
+    }
+
+    // RECURSION
+    public int calculateTotalDuration(Song node, Song startNode, boolean isFirst) {
+        if (node == null || (!isFirst && node == startNode)) {
+            return 0;
+        }
+        return node.duration + calculateTotalDuration(node.next, startNode, false);
+    }
+
+    // Queue
+    private void addLog(String message) {
+        if (logs.size() >= 3) {
+            logs.poll(); // เอาตัวเก่าสุดออกเมื่อเกินโควตา
+        }
+        logs.add(message);
+    }
 
     public static void main(String[] args) {
         VibeTuneEngine vibe = new VibeTuneEngine();
         Scanner sc = new Scanner(System.in);
-        
-        System.out.println("=== VibeTune Java Engine v1.0 ===");
-        //vibe.scanMusicFolders(3);
+
+        System.out.println("=== VibeTune ===");
 
         boolean running = true;
         while (running) { // Iterative Loop
-            System.out.println("\n[1] Add Song [2] Next Song [3] Add to Queue [4] Show History [5] Exit [6] Toggle Loop");
+            System.out.println("\n[1] Add Song [2] Next Song [3] View Library [4] History ");
+            System.out.println(
+                    "[5] Total Duration [6] Toggle Loop [7] System Logs) [8] Exit");
+
             if (vibe.current != null) {
-                System.out.println("\n>> Current Song: " + vibe.current.title);
-            } else {
-                System.out.println("\n>> Current Song: None");
+                System.out.println("\n>> Currently At: " + vibe.current.title + " (" + (vibe.current.duration / 60) + "m " + (vibe.current.duration % 60) + "s)");
             }
             System.out.println(">> Loop Mode: " + (vibe.loopMode ? "ON" : "OFF"));
             System.out.print("Action: ");
+
             String choiceInput = sc.nextLine().trim();
             int choice;
             try {
                 choice = Integer.parseInt(choiceInput);
             } catch (NumberFormatException e) {
-                System.out.println(">> Invalid input! Please enter a number from 1 to 5.");
+                System.out.println(">> Invalid input! Please enter 1-8.");
                 continue;
             }
 
             switch (choice) {
                 case 1:
                     System.out.print("Enter Song Name: ");
-                    vibe.addSong(sc.nextLine());
+                    String name = sc.nextLine();
+                    System.out.print("Enter Duration (e.g., 3.15 for 3m 15s): ");
+                    try {
+                        double val = Double.parseDouble(sc.nextLine());
+                        int mins = (int) val;
+                        int secs = (int) Math.round((val - mins) * 100);
+                        int dur = mins * 60 + secs;
+                        vibe.addSong(name, dur);
+                    } catch (Exception e) {
+                        System.out.println(">> Error: Please input only numbers for duration.");
+                    }
                     break;
                 case 2:
-                    if (vibe.upNext.isEmpty() && vibe.loopMode && !vibe.queueBackup.isEmpty()) {
-                        vibe.upNext.addAll(vibe.queueBackup);
-                        System.out.println(">> Queue loop is ON. Repeating queued songs.");
-                    }
-
-                    if (!vibe.upNext.isEmpty()) {
-                        String queuedSong = vibe.upNext.poll();
-                        System.out.println(">> Playing from Queue: " + queuedSong);
-                        vibe.history.push(queuedSong);
-                        System.out.println(">> Now Playing: " + queuedSong);
-                    } else {
-                        if (!vibe.loopMode) {
-                            System.out.println(">> No more songs in queue.");
-                        }
-                        vibe.playNext();
-                    }
+                    vibe.playNext();
                     break;
                 case 3:
-                    System.out.print("Enter Song to Queue: ");
-                    String qSong = sc.nextLine();
-                    vibe.upNext.add(qSong);
-                    vibe.queueBackup.add(qSong);
-                    System.out.println(">> Enqueued: " + qSong);
+                    vibe.displayLibrary();
                     break;
                 case 4:
                     if (!vibe.history.isEmpty()) {
-                        System.out.println(">> Last Played: " + vibe.history.peek() + " (Pop to see more)");
-                        vibe.history.pop();
+                        System.out.println(">> Last Played: " + vibe.history.pop());
                     } else {
                         System.out.println(">> History is empty!");
                     }
                     break;
                 case 5:
-                    running = false;
-                    System.out.println("Vibe out! See ya.");
+                    if (vibe.head != null) {
+                        int total = vibe.calculateTotalDuration(vibe.head, vibe.head, true);
+                        System.out.println(
+                                ">> Playlist Duration: " + (total / 60) + "m " + (total % 60) + "s (Recursive)");
+                    } else {
+                        System.out.println(">> Playlist is empty!");
+                    }
                     break;
                 case 6:
                     vibe.loopMode = !vibe.loopMode;
+                    vibe.addLog("Toggle Loop: " + (vibe.loopMode ? "ON" : "OFF"));
                     System.out.println(">> Loop mode is now " + (vibe.loopMode ? "ON" : "OFF") + ".");
                     break;
+                case 7:
+                    System.out.println("--- System Logs (Queue FIFO) ---");
+                    if (vibe.logs.isEmpty())
+                        System.out.println("No activity logs.");
+                    for (String s : vibe.logs)
+                        System.out.println(" - " + s);
+                    break;
+                case 8:
+                    running = false;
+                    System.out.println("Vibe out! See ya.");
+                    break;
                 default:
-                    System.out.println("Invalid choice, bro.");
+                    System.out.println("Invalid choice");
             }
         }
         sc.close();
