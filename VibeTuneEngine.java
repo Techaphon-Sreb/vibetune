@@ -108,7 +108,8 @@ public class VibeTuneEngine {
                     "[5] Total Duration [6] Toggle Loop [7] System Logs) [8] Exit");
 
             if (vibe.current != null) {
-                System.out.println("\n>> Currently At: " + vibe.current.title + " (" + (vibe.current.duration / 60) + "m " + (vibe.current.duration % 60) + "s)");
+                System.out.println("\n>> Currently At: " + vibe.current.title + " (" + (vibe.current.duration / 60)
+                        + "m " + (vibe.current.duration % 60) + "s)");
             }
             System.out.println(">> Loop Mode: " + (vibe.loopMode ? "ON" : "OFF"));
             System.out.print("Action: ");
@@ -129,10 +130,14 @@ public class VibeTuneEngine {
                     System.out.print("Enter Duration (e.g., 3.15 for 3m 15s): ");
                     try {
                         double val = Double.parseDouble(sc.nextLine());
-                        int mins = (int) val;
-                        int secs = (int) Math.round((val - mins) * 100);
-                        int dur = mins * 60 + secs;
-                        vibe.addSong(name, dur);
+                        if (val < 0) {
+                            System.out.println(">> Error: Duration cannot be negative.");
+                        } else {
+                            int mins = (int) val;
+                            int secs = (int) Math.round((val - mins) * 100);
+                            int dur = mins * 60 + secs;
+                            vibe.addSong(name, dur);
+                        }
                     } catch (Exception e) {
                         System.out.println(">> Error: Please input only numbers for duration.");
                     }
